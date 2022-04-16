@@ -7,6 +7,7 @@ use serde::Deserialize;
 
 use serde_json;
 
+use std::collections::HashMap;
 use std::fs;
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -34,10 +35,10 @@ fn get_token(path: &str) -> String {
     buf
 }
 
-fn custom_headers() -> HeaderMap {
+fn github_headers() -> HeaderMap {
     let mut headers = HeaderMap::new();
     let username = "maxgallup";
-    let password = get_token("token.txt");
+    let password = get_token("token-github.txt");
     
     let encoded_credentials = base64::encode(format!("{}:{}", username, password));
     let basic_auth = format!("Basic {}", encoded_credentials);
@@ -48,18 +49,36 @@ fn custom_headers() -> HeaderMap {
     headers
 }
 
+fn gitea_headers() -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    headers.insert(USER_AGENT, HeaderValue::from_static("api"));
+    headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    headers
+}
+
 fn trim_quotes(v: &serde_json::Value) -> String {
     v.to_string().trim_matches('\"').to_string()
 }
 
+fn get_content(r: &Repo) -> HashMap<String, String> {
 
 
+
+    HashMap::new()
+}
+
+
+fn migrate(r: &Repo) {
+    gitea_client.post("ads").json(get_content(&repo)).send()?;
+}
 
 fn main() -> Result<(), reqwest::Error> {
 
 
-    let github_base = "https://api.github.com/";
     let user = "maxgallup";
+    let github_base = "https://api.github.com/";
+    let gitea_base = "https://git.basingse.org/api/v1";
     let all_repos = "https://api.github.com/user/repos?per_page=200";
     let public_repos = format!("{}users/{}/repos", github_base, user);
 
@@ -67,7 +86,7 @@ fn main() -> Result<(), reqwest::Error> {
   
     
     let gh_client = reqwest::blocking::Client::builder()
-        .default_headers(custom_headers())
+        .default_headers(github_headers())
         .build()?;
 
     
@@ -89,10 +108,22 @@ fn main() -> Result<(), reqwest::Error> {
         });
     }
 
-    for repo in gh_db {
-        println!("{:?}", repo);
-    }
 
+
+
+    let gitea_username = "maxgallup";
+    let gitea_password = get_token("gitea-token.txt");
+    let gitea_client = reqwest::blocking::Client::builder()
+        .default_headers(gitea_headers())
+        .build()?;
+
+    // gitea_client.
+
+
+    for repo in gh_db {
+        // migrate(repo)
+        
+    }
 
     Ok(())
 }
