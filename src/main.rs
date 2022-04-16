@@ -13,16 +13,12 @@ use std::io::BufReader;
 
 use base64;
 
-
-// #[derive(Deserialize, Debug)]
-// struct Obj {
-//     items: Vec<String>,
-// }
-
-// #[derive(Deserialize, Debug)]
-// struct Repo {
-//     html_url: String,
-// }
+#[derive(Debug)]
+struct Repo {
+    name: String,
+    visibility: String,
+    owner: String,
+}
 
 fn get_token(path: &str) -> String {
 
@@ -52,6 +48,12 @@ fn custom_headers() -> HeaderMap {
     headers
 }
 
+fn trim_quotes(v: &serde_json::Value) -> String {
+    v.to_string().trim_matches('\"').to_string()
+}
+
+
+
 
 fn main() -> Result<(), reqwest::Error> {
 
@@ -59,9 +61,9 @@ fn main() -> Result<(), reqwest::Error> {
     let github_base = "https://api.github.com/";
     let user = "maxgallup";
     let all_repos = "https://api.github.com/user/repos?per_page=200";
-    let _public_repo = format!("{}users/{}/repos", github_base, user);
+    let public_repos = format!("{}users/{}/repos", github_base, user);
 
-    //"https://api.github.com/orgs/$GITHUB_ORGANISATION/repos?per_page=200&type=all"
+    let mut gh_db : Vec<Repo> = Vec::new();
   
     
     let gh_client = reqwest::blocking::Client::builder()
@@ -70,7 +72,7 @@ fn main() -> Result<(), reqwest::Error> {
 
     
 
-    let resp = gh_client.get(all_repos).send()?;
+    let resp = gh_client.get(public_repos).send()?;
 
 
     // println!("resp.status = {:?}", resp.status());
@@ -79,8 +81,16 @@ fn main() -> Result<(), reqwest::Error> {
     let body : serde_json::Value = serde_json::from_str(&resp.text()?).unwrap();
 
     for repo in body.as_array().unwrap() {
-        println!("{} {} {}", &repo["name"].to_string(), &repo["visibility"].to_string(), &repo["owner"]["login"].to_string());
-        // println!("-----------------")
+        
+        gh_db.push( Repo {
+            name: trim_quotes(&repo["name"]),
+            visibility: trim_quotes(&repo["visibility"]),
+            owner: trim_quotes(&repo["owner"]["login"]),
+        });
+    }
+
+    for repo in gh_db {
+        println!("{:?}", repo);
     }
 
 
