@@ -14,6 +14,45 @@ use std::io::BufReader;
 
 use base64;
 
+
+use clap::Parser;
+
+/// Migrate git repositories to a Gitea instance
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Args {
+    /// Migrate only public repos (default)
+    #[clap(long)]
+    public: bool,
+
+    /// Migrate only private repos
+    #[clap(long)]
+    private: bool,
+
+    /// Migrate only public and private repos
+    #[clap(long)]
+    both: bool,
+
+    /// Migrate all repos (including associated repos)
+    #[clap(long)]
+    all: bool,
+
+    
+    /// Base url of github source repo
+    #[clap(long)]
+    from: String,
+
+    /// Base url of gitea destination repo
+    #[clap(long)]
+    to: String,
+
+
+
+
+}
+
+
+
 #[derive(Debug)]
 struct Repo {
     name: String,
@@ -36,6 +75,8 @@ fn get_token(path: &str) -> String {
 }
 
 fn github_headers() -> HeaderMap {
+
+
     let mut headers = HeaderMap::new();
     let username = "maxgallup";
     let password = get_token("token-github.txt");
@@ -69,11 +110,20 @@ fn get_content(r: &Repo) -> HashMap<String, String> {
 }
 
 
-fn migrate(r: &Repo) {
-    gitea_client.post("ads").json(get_content(&repo)).send()?;
-}
+// fn migrate(r: &Repo) {
+//     gitea_client.post("ads").json(get_content(&repo)).send()?;
+// }
 
 fn main() -> Result<(), reqwest::Error> {
+
+    let args = Args::parse();
+
+
+    println!("Hello {}!", args.public);
+    println!("Hello {}!", args.private);
+    println!("Hello {}!", args.both);
+    println!("Hello {}!", args.all);
+    
 
 
     let user = "maxgallup";
@@ -89,7 +139,6 @@ fn main() -> Result<(), reqwest::Error> {
         .default_headers(github_headers())
         .build()?;
 
-    
 
     let resp = gh_client.get(public_repos).send()?;
 
@@ -122,7 +171,7 @@ fn main() -> Result<(), reqwest::Error> {
 
     for repo in gh_db {
         // migrate(repo)
-        
+        println!("{:?}", repo);
     }
 
     Ok(())
