@@ -12,6 +12,9 @@ use std::fs;
 use std::io::prelude::*;
 use std::io::BufReader;
 
+use std::io;
+use std::io::Write;
+
 use base64;
 
 
@@ -158,12 +161,38 @@ fn creds_from_file(path: PathBuf) -> Option<UserData> {
     })
 }
 
+
+
 fn ask_for_creds() -> Option<UserData> {
+    let stdin = io::stdin();
+
+    //TODO repeated code
+    println!("No credentials file specified (--creds), please enter the following:");
+    print!("GITHUB USERNAME: ");
+    io::stdout().flush().unwrap();
+    let mut gh_user = String::new();
+    stdin.read_line(&mut gh_user).unwrap();
+    
+    print!("GITHUB TOKEN: ");
+    io::stdout().flush().unwrap();
+    let mut gh_pass = String::new();
+    stdin.read_line(&mut gh_pass).unwrap();
+    
+    print!("GITEA USERNAME: ");
+    io::stdout().flush().unwrap();
+    let mut gt_user = String::new();
+    stdin.read_line(&mut gt_user).unwrap();
+    
+    print!("GITEA PASSWORD: ");
+    io::stdout().flush().unwrap();
+    let mut gt_pass = String::new();
+    stdin.read_line(&mut gt_pass).unwrap();
+
     Some(UserData {
-        gh: "ask".to_string(),
-        gt: "ask".to_string(),
-        gh_pass: "ask".to_string(),
-        gt_pass: "ask".to_string(),
+        gh: gh_user.trim().to_string(),
+        gt: gt_user.trim().to_string(),
+        gh_pass: gh_pass.trim().to_string(),
+        gt_pass: gt_pass.trim().to_string(),
     })
 }
 
