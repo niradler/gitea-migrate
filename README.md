@@ -1,4 +1,5 @@
 # git-migrate
+Migrate multiple repositories on Github to a Gitea instance automatically
 # TODOs
 - [ ] define requirements
 - [ ] UML diagram
