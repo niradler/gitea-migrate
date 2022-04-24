@@ -140,20 +140,21 @@ fn creds_from_file(path: PathBuf) -> Option<UserData> {
         Ok(file) => file,
         Err(e) => panic!("{:?}", e),
     };
-    
+
     let mut reader = BufReader::new(inner);
-    let mut buf: String = String::new();
-    reader.read_line(&mut buf).expect("Unable to read line");
+    let mut github: String = String::new();
+    let mut gitea: String = String::new();
+    reader.read_line(&mut github).expect("Unable to read line");
+    reader.read_line(&mut gitea).expect("Unable to read line");
 
-    buf
-
-
+    let github : Vec<&str> = github.trim().split(":").collect();
+    let gitea : Vec<&str> = gitea.trim().split(":").collect();
 
     Some(UserData {
-        gh: "file".to_string(),
-        gt: "file".to_string(),
-        gh_pass: "file".to_string(),
-        gt_pass: "file".to_string(),
+        gh: github[0].to_string(),
+        gt: gitea[0].to_string(),
+        gh_pass: github[1].to_string(),
+        gt_pass: gitea[1].to_string(),
     })
 }
 
