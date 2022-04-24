@@ -129,21 +129,54 @@ struct RepoFilter {
 #[derive(Debug)]
 struct UserData {
     gh: String,
-    gh_user: String,
-    gh_pass: String,
     gt: String,
-    gt_user: String,
+    gh_pass: String,
     gt_pass: String,
 }
 
+fn creds_from_file(path: PathBuf) -> Option<UserData> {
+
+    let inner = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(e) => panic!("{:?}", e),
+    };
+    
+    let mut reader = BufReader::new(inner);
+    let mut buf: String = String::new();
+    reader.read_line(&mut buf).expect("Unable to read line");
+
+    buf
+
+
+
+    Some(UserData {
+        gh: "file".to_string(),
+        gt: "file".to_string(),
+        gh_pass: "file".to_string(),
+        gt_pass: "file".to_string(),
+    })
+}
+
+fn ask_for_creds() -> Option<UserData> {
+    Some(UserData {
+        gh: "ask".to_string(),
+        gt: "ask".to_string(),
+        gh_pass: "ask".to_string(),
+        gt_pass: "ask".to_string(),
+    })
+}
 
 fn main() -> Result<(), reqwest::Error> {
 
     let args = Args::parse();
 
-    println!(">>> {:?}", args.creds);
-    println!(">>> {:?}", args.to_url);
-    println!(">>> {:?}", args.from_url);
+    let gh_url = args.from_url;
+    let gt_url = args.to_url;
+
+    let user : Option<UserData> = match args.creds {
+        Some(path) => creds_from_file(path),
+        None => ask_for_creds(),
+    };
 
     let filter = RepoFilter {
         public: !args.private || args.both || args.all,
@@ -151,14 +184,7 @@ fn main() -> Result<(), reqwest::Error> {
         any_owner: args.all,
     };
 
-    let user = UserData {
-        gh: args.from_url,
-        gt: args.to_url,
-        gh_user: "asdf".to_string(),
-        gt_user: "asdf".to_string(),
-        gh_pass: "asdf".to_string(),
-        gt_pass: "asdf".to_string(),
-    };
+    println!("{:?}", user);
 
     // let user = "maxgallup";
     // let github_base = "https://api.github.com/";
