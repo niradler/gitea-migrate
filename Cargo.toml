@@ -7,7 +7,6 @@ readme = "README.md"
 description = "A basic script that automatically migrates all github repositories to a gitea instance"
 homepage = "basingse.org"
 repository = "https://github.com/maxgallup/gitea-migrate"
-license-file = "LICENSE"
 license = "GPL-2.0-or-later"
 
 

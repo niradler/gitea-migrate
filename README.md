@@ -1,4 +1,4 @@
-# git-migrate
+# gitea-migrate
 Migrate or mirror multiple repositories from Github to a Gitea instance.
 It can be used manually as a cli tool, or automated on a server with something like cron jobs.
 
@@ -24,16 +24,16 @@ enter credentials every time, you can simply enter your credentials in a file an
 github_username:github_access_token
 gitea_username:gitea_password
 ```
-**IMPORTANT** Be sure to follow the above layout exactly, otherwise your credentials won't be parsed correctly. (if you feel like there is a better way to store credentials open a [pull request](https://github.com/maxgallup/git-migrate/pulls)! )
+**IMPORTANT** Be sure to follow the above layout exactly, otherwise your credentials won't be parsed correctly. (if you feel like there is a better way to store credentials open a [pull request](https://github.com/maxgallup/gitea-migrate/pulls)! )
 
 ### Examples
 ```
-git-migrate --dest https://gitea.example.com --both
+gitea-migrate --dest https://gitea.example.com --both
 ```
 This will **mirror** all private and public repos under the github username that was manually entered.
 
 ```
-git-migrate --dest https://gitea.example.com --all --no-mirror --creds ~/credentials.txt 
+gitea-migrate --dest https://gitea.example.com --all --no-mirror --creds ~/credentials.txt 
 ```
 This will **migrate** (and not mirror) all private and public repos associated with the user specified in the `credentials.txt` file. 
 
