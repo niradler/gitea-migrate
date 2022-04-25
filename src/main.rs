@@ -50,7 +50,7 @@ struct Args {
 
     /// (optional) uses a custom credentials file with: 
     /// "github_user:github_token" and "gitea_user:gitea_password"
-    /// on separate lines (see docs)
+    /// on separate lines (see README)
     #[clap(short, long, parse(from_os_str), value_name = "FILE")]
     creds: Option<PathBuf>,
 
