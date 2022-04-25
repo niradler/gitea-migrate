@@ -8,7 +8,8 @@ description = "A basic script that automatically migrates all github repositorie
 homepage = "basingse.org"
 repository = "https://github.com/maxgallup/gitea-migrate"
 license = "GPL-2.0-or-later"
-
+keywords = ["git", "gitea", "automation"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 reqwest = { version = "0.11", features = ["blocking", "json"] }
