@@ -77,9 +77,9 @@ struct Args {
 
 
 
-// fn trim_quotes(v: &serde_json::Value) -> String {
-//     v.to_string().trim_matches('\"').to_string()
-// }
+fn trim_quotes(v: &serde_json::Value) -> String {
+    v.to_string().trim_matches('\"').to_string()
+}
 
 // fn get_content(r: &Repo) -> HashMap<String, String> {
 
@@ -116,10 +116,13 @@ struct UserData {
 }
 
 fn github_headers(user: &UserData) -> HeaderMap {
-
     let mut headers = HeaderMap::new();
-    let username = &user.gh; 
-    let password = &user.gh_pass.as_ref().unwrap();
+    let username = &user.gh;
+    
+    let password = match &user.gh_pass {
+        Some(s) => s,
+        None => "",
+    };
 
     let encoded_credentials = base64::encode(format!("{}:{}", username, password));
     let basic_auth = format!("Basic {}", encoded_credentials);
@@ -231,51 +234,45 @@ fn main() -> Result<(), reqwest::Error> {
         None => ask_for_creds(options.requires_token),
     };
 
-    match user {
-        Some(_) => (),
+    let user = match user {
+        Some(u) => u,
         None => return Ok(()),
-    }
-
-    let user : UserData = user.unwrap();
-
+    };
 
     let gh_base_url = "https://api.github.com/";
-
+    let mut gh_api_url = String::new();
 
     if options.requires_token {
-
-        println!("requires token");
-
+        gh_api_url = format!("{}user/repos?per_page=200", gh_base_url);
     } else {
-        let gh_public_url = format!("{}users/{}/repos", gh_base_url, user.gh);
-        let gh_client = reqwest::blocking::Client::builder()
-            .default_headers(github_headers(&user))
-            .build()?;
-    
-        let resp = gh_client.get(gh_public_url).send()?;
-        println!("resp.text = {:?}", resp.text()?);
+        gh_api_url = format!("{}users/{}/repos", gh_base_url, user.gh);
     }
 
+    let gh_client = reqwest::blocking::Client::builder()
+        .default_headers(github_headers(&user))
+        .build()?;
 
+    let resp = gh_client.get(gh_api_url).send()?;
+    
 
     // let gitea_base = "https://git.basingse.org/api/v1";
     // let all_repos = "https://api.github.com/user/repos?per_page=200";
 
-    // let mut gh_db : Vec<Repo> = Vec::new();
+    let mut gh_db : Vec<Repo> = Vec::new();
 
 
     // // println!("resp.status = {:?}", resp.status());
     // // println!("resp.headers = {:?}", resp.headers());
-    // let body : serde_json::Value = serde_json::from_str(&resp.text()?).unwrap();
+    let body : serde_json::Value = serde_json::from_str(&resp.text()?).unwrap();
 
-    // for repo in body.as_array().unwrap() {
+    for repo in body.as_array().unwrap() {
 
-    //     gh_db.push( Repo {
-    //         name: trim_quotes(&repo["name"]),
-    //         visibility: trim_quotes(&repo["visibility"]),
-    //         owner: trim_quotes(&repo["owner"]["login"]),
-    //     });
-    // }
+        gh_db.push( Repo {
+            name: trim_quotes(&repo["name"]),
+            visibility: trim_quotes(&repo["visibility"]),
+            owner: trim_quotes(&repo["owner"]["login"]),
+        });
+    }
 
     // let gitea_username = "maxgallup";
     // let gitea_password = get_token("gitea-token.txt");
@@ -285,10 +282,10 @@ fn main() -> Result<(), reqwest::Error> {
 
     // // gitea_client.
 
-    // for repo in gh_db {
-    //     // migrate(repo)
-    //     println!("{:?}", repo);
-    // }
+    for repo in gh_db {
+        // migrate(repo)
+        println!("{:?}", repo);
+    }
 
     Ok(())
 }
