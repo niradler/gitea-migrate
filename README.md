@@ -45,4 +45,5 @@ This will **migrate** (and not mirror) all private and public repos associated w
 - [ ] add logging
 - [ ] add support for other git platforms (gitlab, bitbucket...)
 - [ ] add async code or multithreading? - overkill for this project, but the purpose of this project is to learn anyway ;)
+- [ ] improve maintainability of source code
 

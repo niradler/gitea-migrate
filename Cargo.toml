@@ -1,9 +1,15 @@
 [package]
-name = "git-migrate"
+name = "gitea-migrate"
 version = "0.1.0"
 edition = "2021"
+authors = ["Max Gallup"]
+readme = "README.md"
+description = "A basic script that automatically migrates all github repositories to a gitea instance"
+homepage = "basingse.org"
+repository = "https://github.com/maxgallup/gitea-migrate"
+license-file = "LICENSE"
+license = "GPL-2.0-or-later"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 reqwest = { version = "0.11", features = ["blocking", "json"] }
