@@ -1,6 +1,6 @@
 # gitea-migrate
 Migrate or mirror multiple repositories from Github to a Gitea instance.
-It can be used manually as a cli tool, or automated on a server with something like cron jobs.
+It can be used manually as a cli tool, or automated on a server with something like cron jobs. The main aim of this repository was to learn more rust and publish code to [crates.io](crates.io)!
 
 
 # Features
