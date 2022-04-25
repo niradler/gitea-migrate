@@ -3,11 +3,10 @@ use std::path::PathBuf;
 use reqwest::header::*;
 use reqwest::{self, header::HeaderMap};
 
-use serde::Deserialize;
-
 use serde_json;
+use serde_json::json;
+use serde_json::Value;
 
-use std::collections::HashMap;
 use std::fs;
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -19,6 +18,8 @@ use base64;
 
 use clap::Parser;
 
+// use log::{info, warn}; // TODO Logging
+
 /// Migrate git repositories to a Gitea instance
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
@@ -27,68 +28,36 @@ struct Args {
     #[clap(long)]
     public: bool,
 
-    /// migrate only private repos (requires Github Username password)
+    /// migrate only private repos
     #[clap(long)]
     private: bool,
 
-    /// migrate only public and private repos (requires Github Username password)
+    /// migrate only public and private repos
     #[clap(long)]
     both: bool,
 
-    /// migrate all repos, including associated repos (requires Github Username password)
+    /// migrate all repos including associated repos from other users/orgs
     #[clap(long)]
     all: bool,
 
-    // /// name of the user/org to migrate repositories from
-    // #[clap(short, long, value_name = "NAME")]
-    // from: String,
-
-    /// desitnation url of gitea server: "gitea.example.com"
+    /// desitnation url of gitea server: "https://gitea.example.com"
     #[clap(short, long, value_name = "URL")]
     dest: String,
 
-    /// print useful information to stdout
+    /// print useful information to stdout TODO logging
     #[clap(short, long)]
     verbose: bool,
 
-    /// (optional) uses a custom credentials file with:
-    /// github_user:github_token gitea_user:gitea_password
+    /// (optional) uses a custom credentials file with: 
+    /// "github_user:github_token" and "gitea_user:gitea_password"
+    /// on separate lines (see docs)
     #[clap(short, long, parse(from_os_str), value_name = "FILE")]
     creds: Option<PathBuf>,
+
+    /// set if repository shouldn't be mirrored
+    #[clap(short, long)]
+    no_mirror: bool,
 }
-
-
-
-// fn get_token(path: &str) -> String {
-
-//     let inner = match fs::File::open(path) {
-//         Ok(file) => file,
-//         Err(e) => panic!("{:?}", e),
-//     };
-
-//     let mut reader = BufReader::new(inner);
-//     let mut buf: String = String::new();
-//     reader.read_line(&mut buf).expect("Unable to read line");
-
-//     buf
-// }
-
-
-
-
-
-fn trim_quotes(v: &serde_json::Value) -> String {
-    v.to_string().trim_matches('\"').to_string()
-}
-
-// fn get_content(r: &Repo) -> HashMap<String, String> {
-
-//     HashMap::new()
-// }
-
-// fn migrate(r: &Repo) {
-//     gitea_client.post("ads").json(get_content(&repo)).send()?;
-// }
 
 #[derive(Debug)]
 struct Repo {
@@ -99,7 +68,7 @@ struct Repo {
 
 #[allow(dead_code)]
 #[derive(Debug)]
-struct RepoOptions {
+struct UserSettings {
     public: bool,
     private: bool,
     any_owner: bool,
@@ -111,20 +80,18 @@ struct RepoOptions {
 struct UserData {
     gh: String,
     gt: String,
-    gh_pass: Option<String>,
+    gh_pass: String,
     gt_pass: String,
+}
+
+fn trim_quotes(v: &serde_json::Value) -> String {
+    v.to_string().trim_matches('\"').to_string()
 }
 
 fn github_headers(user: &UserData) -> HeaderMap {
     let mut headers = HeaderMap::new();
-    let username = &user.gh;
-    
-    let password = match &user.gh_pass {
-        Some(s) => s,
-        None => "",
-    };
 
-    let encoded_credentials = base64::encode(format!("{}:{}", username, password));
+    let encoded_credentials = base64::encode(format!("{}:{}", &user.gh, &user.gh_pass));
     let basic_auth = format!("Basic {}", encoded_credentials);
 
     headers.insert(AUTHORIZATION, HeaderValue::from_str(&basic_auth).unwrap());
@@ -133,15 +100,19 @@ fn github_headers(user: &UserData) -> HeaderMap {
     headers
 }
 
-fn gitea_headers() -> HeaderMap {
+fn gitea_headers(user: &UserData) -> HeaderMap {
     let mut headers = HeaderMap::new();
+    let encoded_credentials = base64::encode(format!("{}:{}", &user.gt, &user.gt_pass));
+    let basic_auth = format!("Basic {}", encoded_credentials);
+
+    headers.insert(AUTHORIZATION, HeaderValue::from_str(&basic_auth).unwrap());
     headers.insert(USER_AGENT, HeaderValue::from_static("api"));
     headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
     headers
 }
 
-fn creds_from_file(path: PathBuf, require_token: bool) -> Option<UserData> {
+fn creds_from_file(path: PathBuf) -> Option<UserData> {
     let inner = match fs::File::open(&path) {
         Ok(file) => file,
         Err(e) => panic!("{:?}", e),
@@ -153,19 +124,14 @@ fn creds_from_file(path: PathBuf, require_token: bool) -> Option<UserData> {
     reader.read_line(&mut github).expect("Unable to read line");
     reader.read_line(&mut gitea).expect("Unable to read line");
 
-    let mut token: Option<String> = None;
     let github: Vec<&str> = github.trim().split(":").collect();
-    if !(github[0].len() > 0) {
+    if !(github.len() == 2) {
         // TODO Make custom error messages (macros?)
         eprintln!("ERROR: unable to read github username from {:?}", &path);
         return None;
     }
-    if require_token && github.len() == 2 {
-        token = Some(github[1].to_string());
-    }
 
     let gitea: Vec<&str> = gitea.trim().split(":").collect();
-
     if !(gitea.len() == 2) {
         // TODO Make custom error messages (macros?)
         eprintln!("ERROR: unable to read gitea information from {:?}", &path);
@@ -175,12 +141,12 @@ fn creds_from_file(path: PathBuf, require_token: bool) -> Option<UserData> {
     Some(UserData {
         gh: github[0].to_string(),
         gt: gitea[0].to_string(),
-        gh_pass: token,
+        gh_pass: github[1].to_string(),
         gt_pass: gitea[1].to_string(),
     })
 }
 
-fn ask_for_creds(require_token: bool) -> Option<UserData> {
+fn ask_for_creds() -> Option<UserData> {
     let stdin = io::stdin();
 
     //TODO repeated code
@@ -190,14 +156,10 @@ fn ask_for_creds(require_token: bool) -> Option<UserData> {
     let mut gh_user = String::new();
     stdin.read_line(&mut gh_user).unwrap();
 
-    let mut token: Option<String> = None;
-    if require_token {
-        print!("GITHUB TOKEN: ");
-        io::stdout().flush().unwrap();
-        let mut gh_pass = String::new();
-        stdin.read_line(&mut gh_pass).unwrap();
-        token = Some(gh_pass.trim().to_string());
-    }
+    print!("GITHUB TOKEN: ");
+    io::stdout().flush().unwrap();
+    let mut gh_pass = String::new();
+    stdin.read_line(&mut gh_pass).unwrap();
 
     print!("GITEA USERNAME: ");
     io::stdout().flush().unwrap();
@@ -212,17 +174,40 @@ fn ask_for_creds(require_token: bool) -> Option<UserData> {
     Some(UserData {
         gh: gh_user.trim().to_string(),
         gt: gt_user.trim().to_string(),
-        gh_pass: token,
+        gh_pass: gh_pass.trim().to_string(),
         gt_pass: gt_pass.trim().to_string(),
     })
 }
 
+fn gitea_body(no_mirror: bool, r: &Repo, u: &UserData) -> Value {
+
+    let mut mirror = true;
+    if no_mirror { mirror = false; }
+
+    let mut private = false;
+    if r.visibility == "private" { private = true; }
+
+    let url = format!("https://github.com/{}/{}", &r.owner, &r.name);
+    
+    json!({
+        "auth_username": u.gh,
+        "auth_password": u.gh_pass,
+        "clone_addr": url,
+        "repo_name": r.name,
+        "repo_owner": u.gt,
+        "auth_password": u.gh_pass,
+        "mirror": mirror,
+        "private": private,
+        "service": "git",
+        "wiki": true,
+    })
+}
+
+
 fn main() -> Result<(), reqwest::Error> {
     let args = Args::parse();
 
-    let gt_url = args.dest;
-
-    let options = RepoOptions {
+    let options = UserSettings {
         public: !args.private || args.both || args.all,
         private: args.private || args.both || args.all,
         any_owner: args.all,
@@ -230,8 +215,8 @@ fn main() -> Result<(), reqwest::Error> {
     };
 
     let user: Option<UserData> = match args.creds {
-        Some(path) => creds_from_file(path, options.requires_token),
-        None => ask_for_creds(options.requires_token),
+        Some(path) => creds_from_file(path),
+        None => ask_for_creds(),
     };
 
     let user = match user {
@@ -240,29 +225,19 @@ fn main() -> Result<(), reqwest::Error> {
     };
 
     let gh_base_url = "https://api.github.com/";
-    let mut gh_api_url = String::new();
-
-    if options.requires_token {
-        gh_api_url = format!("{}user/repos?per_page=200", gh_base_url);
-    } else {
-        gh_api_url = format!("{}users/{}/repos", gh_base_url, user.gh);
-    }
+    let gt_url = format!("{}/api/v1/repos/migrate", args.dest);
+    let gh_api_url = format!("{}user/repos?per_page=200", gh_base_url);
+    
+    
 
     let gh_client = reqwest::blocking::Client::builder()
         .default_headers(github_headers(&user))
         .build()?;
 
     let resp = gh_client.get(gh_api_url).send()?;
-    
-
-    // let gitea_base = "https://git.basingse.org/api/v1";
-    // let all_repos = "https://api.github.com/user/repos?per_page=200";
 
     let mut gh_db : Vec<Repo> = Vec::new();
 
-
-    // // println!("resp.status = {:?}", resp.status());
-    // // println!("resp.headers = {:?}", resp.headers());
     let body : serde_json::Value = serde_json::from_str(&resp.text()?).unwrap();
 
     for repo in body.as_array().unwrap() {
@@ -271,7 +246,6 @@ fn main() -> Result<(), reqwest::Error> {
         let owner = trim_quotes(&repo["owner"]["login"]);
 
         let user_is_owner = owner == user.gh;
-        let is_public = "public" == visibility;
         let is_private = "private" == visibility;
 
         let repo = Repo {
@@ -291,18 +265,19 @@ fn main() -> Result<(), reqwest::Error> {
         }
     }
 
-    // let gitea_username = "maxgallup";
-    // let gitea_password = get_token("gitea-token.txt");
-    // let gitea_client = reqwest::blocking::Client::builder()
-    //     .default_headers(gitea_headers())
-    //     .build()?;
-
-    // // gitea_client.
+    let gitea_client = reqwest::blocking::Client::builder()
+        .default_headers(gitea_headers(&user))
+        .build()?;
 
     for repo in gh_db {
-        // migrate(repo)
-        println!("{:?}", repo);
+        println!("Migrating: {}", repo.name);
+
+        gitea_client.post(&gt_url)
+            .json(&gitea_body(args.no_mirror, &repo, &user))
+            .send()?;
+        
     }
+
 
     Ok(())
 }
