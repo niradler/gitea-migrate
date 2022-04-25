@@ -39,13 +39,13 @@ struct Args {
     #[clap(long)]
     all: bool,
 
-    /// name of the user/org to migrate repositories from
-    #[clap(short, long, value_name = "NAME")]
-    from: String,
+    // /// name of the user/org to migrate repositories from
+    // #[clap(short, long, value_name = "NAME")]
+    // from: String,
 
-    /// base url of gitea destination repo
+    /// desitnation url of gitea server: "gitea.example.com"
     #[clap(short, long, value_name = "URL")]
-    to_url: String,
+    dest: String,
 
     /// print useful information to stdout
     #[clap(short, long)]
@@ -220,7 +220,7 @@ fn ask_for_creds(require_token: bool) -> Option<UserData> {
 fn main() -> Result<(), reqwest::Error> {
     let args = Args::parse();
 
-    let gt_url = args.to_url;
+    let gt_url = args.dest;
 
     let options = RepoOptions {
         public: !args.private || args.both || args.all,
@@ -266,12 +266,29 @@ fn main() -> Result<(), reqwest::Error> {
     let body : serde_json::Value = serde_json::from_str(&resp.text()?).unwrap();
 
     for repo in body.as_array().unwrap() {
+        let name = trim_quotes(&repo["name"]);
+        let visibility = trim_quotes(&repo["visibility"]);
+        let owner = trim_quotes(&repo["owner"]["login"]);
 
-        gh_db.push( Repo {
-            name: trim_quotes(&repo["name"]),
-            visibility: trim_quotes(&repo["visibility"]),
-            owner: trim_quotes(&repo["owner"]["login"]),
-        });
+        let user_is_owner = owner == user.gh;
+        let is_public = "public" == visibility;
+        let is_private = "private" == visibility;
+
+        let repo = Repo {
+            name,
+            visibility,
+            owner,
+        };
+        
+        if options.any_owner {
+            gh_db.push(repo); // --all
+        } else if options.public && options.private {
+            if user_is_owner { gh_db.push(repo); } // --both
+        } else if options.private {
+            if user_is_owner && is_private { gh_db.push(repo); } // --private
+        } else {
+            if user_is_owner && !is_private { gh_db.push(repo); } // --public
+        }
     }
 
     // let gitea_username = "maxgallup";
