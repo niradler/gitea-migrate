@@ -37,7 +37,10 @@ gitea-migrate --dest https://gitea.example.com --all --no-mirror --creds ~/crede
 ```
 This will **migrate** (and not mirror) all private and public repos associated with the user specified in the `credentials.txt` file. 
 
-
+### Install
+```
+cargo install gitea-migrate
+```
 
 
 
