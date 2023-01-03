@@ -10,6 +10,7 @@ Specify exactly which repositories should be mirrored or migrated with the follo
 * `--both` - only mirror all private and public repositories under your username
 * `--all` - mirror all private and public repositories including ones from other users that you are associated with
 * `--no-mirror` - will only clone the repositories (not as mirrors)
+* `--fork` - will include forked repositories
 
 # Usage
 You must specify a destination URL to the target Gitea instance as a cli argument.

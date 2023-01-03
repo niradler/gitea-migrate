@@ -32,6 +32,10 @@ struct Args {
     #[clap(long)]
     private: bool,
 
+    /// migrate fork repos
+    #[clap(long)]
+    fork: bool,
+
     /// migrate only public and private repos
     #[clap(long)]
     both: bool,
@@ -73,6 +77,7 @@ struct UserSettings {
     private: bool,
     any_owner: bool,
     requires_token: bool,
+    fork: bool,
 }
 
 #[allow(dead_code)]
@@ -203,7 +208,6 @@ fn gitea_body(no_mirror: bool, r: &Repo, u: &UserData) -> Value {
     })
 }
 
-
 fn main() -> Result<(), reqwest::Error> {
     let args = Args::parse();
 
@@ -212,6 +216,7 @@ fn main() -> Result<(), reqwest::Error> {
         private: args.private || args.both || args.all,
         any_owner: args.all,
         requires_token: args.private || args.both || args.all,
+        fork: args.fork,
     };
 
     let user: Option<UserData> = match args.creds {
@@ -226,10 +231,8 @@ fn main() -> Result<(), reqwest::Error> {
 
     let gh_base_url = "https://api.github.com/";
     let gt_url = format!("{}/api/v1/repos/migrate", args.dest);
-    let gh_api_url = format!("{}user/repos?per_page=200", gh_base_url);
+    let gh_api_url = format!("{}user/repos?per_page=100", gh_base_url);
     
-    
-
     let gh_client = reqwest::blocking::Client::builder()
         .default_headers(github_headers(&user))
         .build()?;
@@ -240,35 +243,60 @@ fn main() -> Result<(), reqwest::Error> {
 
     let body : serde_json::Value = serde_json::from_str(&resp.text()?).unwrap();
 
-    for repo in body.as_array().unwrap() {
-        let name = trim_quotes(&repo["name"]);
-        let visibility = trim_quotes(&repo["visibility"]);
-        let owner = trim_quotes(&repo["owner"]["login"]);
+    let mut count = 1;
+    while body.as_array().unwrap().len() != 0 {
+        let gh_api_url = format!("{}user/repos?per_page=100&page={}", gh_base_url, count);
+        count+=1;
+        let gh_client = reqwest::blocking::Client::builder()
+            .default_headers(github_headers(&user))
+            .build()?;
+    
+        let resp = gh_client.get(gh_api_url).send()?;
+    
+        let body : serde_json::Value = serde_json::from_str(&resp.text()?).unwrap();
 
-        let user_is_owner = owner == user.gh;
-        let is_private = "private" == visibility;
+        if body.as_array().unwrap().len() == 0 {
+            break;
+        }
+        for repo in body.as_array().unwrap() {
+            let name = trim_quotes(&repo["name"]);
 
-        let repo = Repo {
-            name,
-            visibility,
-            owner,
-        };
-        
-        if options.any_owner {
-            gh_db.push(repo); // --all
-        } else if options.public && options.private {
-            if user_is_owner { gh_db.push(repo); } // --both
-        } else if options.private {
-            if user_is_owner && is_private { gh_db.push(repo); } // --private
-        } else {
-            if user_is_owner && !is_private { gh_db.push(repo); } // --public
+            let visibility = trim_quotes(&repo["visibility"]);
+            let owner = trim_quotes(&repo["owner"]["login"]);
+    
+            let user_is_owner = owner == user.gh;
+            let is_private = "private" == visibility;
+            let mut not_fork = trim_quotes(&repo["fork"]) == "false";
+
+            if options.fork {
+                not_fork = true;
+            }
+            
+            let repo = Repo {
+                name,
+                visibility,
+                owner,
+            };
+            if not_fork {
+                if options.any_owner {
+                    gh_db.push(repo); // --all
+                } else if options.public && options.private {
+                    if user_is_owner { gh_db.push(repo); } // --both
+                } else if options.private {
+                    if user_is_owner && is_private { gh_db.push(repo); } // --private
+                } else {
+                    if user_is_owner && !is_private { gh_db.push(repo); } // --public
+                }
+            }
+
         }
     }
+
 
     let gitea_client = reqwest::blocking::Client::builder()
         .default_headers(gitea_headers(&user))
         .build()?;
-
+    println!("found repos: {}", gh_db.len());
     for repo in gh_db {
         println!("Migrating: {}", repo.name);
 
